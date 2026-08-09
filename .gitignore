@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw data is large and reproducible from scripts/download_data.py - do not commit it.
+# Processed/interim data and all outputs (figures, metrics, forecasts) ARE committed,
+# since the assignment requires generated figures/metrics to be present in the repo.
+data/raw/*
+!data/raw/.gitkeep
+
+# Downloaded/cached foundation model weights (large, reproducible from HF hub)
+.cache/
+*.pt
+*.safetensors
+
