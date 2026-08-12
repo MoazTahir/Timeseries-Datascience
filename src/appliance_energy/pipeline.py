@@ -165,6 +165,13 @@ def run_pipeline(
     fig = P.plot_sarima_grid_heatmap(grid_df, d_value=best_order[1])
     _save_fig(fig, config.FIGURE_DIR / "09_sarima_aic_heatmap.png")
 
+    # Makes the "exogenous weather doesn't help" finding (Part 9, Q2/Q5)
+    # visible, not just tabulated: the two forecast lines should track
+    # each other closely rather than the +exog line visibly tracking the
+    # actuals better.
+    fig = P.plot_sarimax_variant_comparison(test, sarimax_uni_forecast, sarimax_exog_forecast)
+    _save_fig(fig, config.FIGURE_DIR / "15_sarimax_univariate_vs_exog.png")
+
     # ----------------------------------------------------------------
     # 5+6. Feature table + feature-based ML model
     # ----------------------------------------------------------------
@@ -193,6 +200,12 @@ def run_pipeline(
     ablation_df.to_csv(config.METRICS_DIR / "feature_ablation.csv", index=False)
     print(ablation_df)
 
+    # Makes the "more features made it worse" finding (Part 9, Q3) visible
+    # as a figure, not just a table - the full-feature bar should NOT be
+    # the tallest-green (best) bar.
+    fig = P.plot_feature_ablation(ablation_df)
+    _save_fig(fig, config.FIGURE_DIR / "16_feature_ablation.png")
+
     # ----------------------------------------------------------------
     # 7. Foundation model
     # ----------------------------------------------------------------
@@ -213,11 +226,14 @@ def run_pipeline(
         foundation_path = config.FORECAST_DIR / "foundation_forecast.csv"
         foundation_result = pd.read_csv(foundation_path, index_col=0, parse_dates=True)
         forecasts["foundation_model"] = foundation_result["foundation_model"]
-        # foundation_result also carries foundation_lower/foundation_upper
-        # quantile columns (Chronos's 10-90% interval); plotted alongside
-        # the SARIMAX confidence interval in notebooks/06_foundation_model.ipynb
-        # rather than here, to keep the main comparison figure below readable
-        # with only one uncertainty band.
+
+        foundation_ci = None
+        if {"foundation_lower", "foundation_upper"}.issubset(foundation_result.columns):
+            foundation_ci = foundation_result[["foundation_lower", "foundation_upper"]].rename(
+                columns={"foundation_lower": "lower", "foundation_upper": "upper"}
+            )
+        fig = P.plot_foundation_forecast(test, forecasts["foundation_model"], foundation_ci)
+        _save_fig(fig, config.FIGURE_DIR / "17_foundation_model_forecast.png")
 
     # ----------------------------------------------------------------
     # 8. Consolidated evaluation

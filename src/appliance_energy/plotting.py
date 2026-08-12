@@ -247,14 +247,109 @@ def plot_sarima_grid_heatmap(grid_df: pd.DataFrame, d_value: int, title: str | N
     """
     Heatmap of AIC over (p, q) for a fixed d, from the SARIMA grid search
     results table (columns: p, d, q, aic).
+
+    ``robust=True`` colour-scales off the 2nd/98th percentile of AIC
+    rather than its true min/max: a handful of over-parameterised (p, q)
+    combinations are numerically unstable and land AIC values many
+    thousands higher than every sensible candidate, which would
+    otherwise stretch the colour scale so far that the actually
+    converged, informative cells all render as a single flat colour.
+    Annotating each cell with its AIC (rounded to the nearest 10) makes
+    the figure readable as a real reference table, not just a colour
+    gradient.
     """
     subset = grid_df[grid_df["d"] == d_value]
     pivot = subset.pivot(index="p", columns="q", values="aic")
 
-    fig, ax = plt.subplots(figsize=(9, 7))
-    sns.heatmap(pivot, annot=False, cmap="viridis_r", ax=ax)
+    fig, ax = plt.subplots(figsize=(10, 7.5))
+    sns.heatmap(
+        pivot,
+        annot=True,
+        fmt=".0f",
+        annot_kws={"fontsize": 7},
+        cmap="viridis_r",
+        robust=True,
+        ax=ax,
+    )
     ax.set_title(title or f"SARIMA AIC grid (d={d_value})")
     ax.set_xlabel("q")
     ax.set_ylabel("p")
+    fig.tight_layout()
+    return fig
+
+
+def plot_feature_ablation(ablation_df: pd.DataFrame, title: str = "Feature-group ablation (XGBoost)"):
+    """
+    MASE per feature-group configuration, from the ablation study
+    (columns: model [feature-group label], MASE). ``run_feature_group_ablation``
+    returns its rows sorted by MASE ascending, so bars run best-to-worst
+    left-to-right; the best (green) bar is never the full-feature-set
+    configuration, which is the point being visualised.
+    """
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    colours = ["tab:green" if v == ablation_df["MASE"].min() else "tab:blue" for v in ablation_df["MASE"]]
+    ax.bar(ablation_df["model"], ablation_df["MASE"], color=colours)
+    for i, v in enumerate(ablation_df["MASE"]):
+        ax.text(i, v + 0.01, f"{v:.3f}", ha="center", fontsize=9)
+    ax.set_title(title)
+    ax.set_ylabel("MASE (lower = better)")
+    ax.tick_params(axis="x", rotation=20)
+    fig.tight_layout()
+    return fig
+
+
+def plot_foundation_forecast(
+    test: pd.Series,
+    foundation_forecast: pd.Series,
+    foundation_ci: pd.DataFrame | None = None,
+    title: str = "Chronos (zero-shot) rolling forecast - full test period",
+):
+    """Standalone full-test-period plot of the foundation model forecast with its quantile band."""
+    fig, ax = plt.subplots(figsize=(14, 6))
+    test.plot(ax=ax, label="Actual", color="black", linewidth=2)
+    foundation_forecast.plot(ax=ax, label="Chronos (zero-shot)", color="tab:purple", linewidth=1.3)
+    if foundation_ci is not None:
+        ax.fill_between(
+            foundation_ci.index,
+            foundation_ci["lower"],
+            foundation_ci["upper"],
+            color="tab:purple",
+            alpha=0.15,
+            label="10-90% interval",
+        )
+    ax.set_title(title)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Appliances (Wh)")
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
+def plot_sarimax_variant_comparison(
+    test: pd.Series,
+    sarimax_univariate: pd.Series,
+    sarimax_exog: pd.Series,
+    days: int = 6,
+    title: str = "SARIMAX: target-only vs. + exogenous weather",
+):
+    """
+    Zoomed comparison of the two SARIMAX variants against actuals, to
+    make visible (not just tabulated) that the exogenous variant does
+    not track the actuals any more closely than the univariate one.
+    """
+    window_index = test.index[: days * 24]
+
+    fig, ax = plt.subplots(figsize=(13, 5.5))
+    test.loc[window_index].plot(ax=ax, label="Actual", color="black", linewidth=2.2)
+    sarimax_univariate.loc[window_index].plot(
+        ax=ax, label="SARIMAX (target-only)", color="tab:blue", linewidth=1.4
+    )
+    sarimax_exog.loc[window_index].plot(
+        ax=ax, label="SARIMAX (+ exogenous weather)", color="tab:red", linewidth=1.4, linestyle="--"
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Appliances (Wh)")
+    ax.legend()
     fig.tight_layout()
     return fig
