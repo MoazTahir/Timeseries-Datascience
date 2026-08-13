@@ -8,6 +8,7 @@ of the modelling modules keeps those testable and this one visual-only.
 
 from __future__ import annotations
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -109,6 +110,13 @@ def plot_residual_diagnostics(residuals: pd.Series, title: str = "Residual diagn
     axes[0, 0].plot(residuals.index, residuals.values, linewidth=0.8, color="tab:blue")
     axes[0, 0].axhline(0, color="black", linewidth=0.8, linestyle="--")
     axes[0, 0].set_title("Residuals over time")
+    # Weekly-spaced ticks with a compact "01 Feb" style label - the
+    # default datetime locator/formatter crams in far too many
+    # timestamps for a ~3000-hour index and the labels overlap into an
+    # unreadable block. A fixed weekly locator plus ConciseDateFormatter
+    # keeps a handful of clean, evenly-spaced labels instead.
+    axes[0, 0].xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
+    axes[0, 0].xaxis.set_major_formatter(mdates.ConciseDateFormatter(axes[0, 0].xaxis.get_major_locator()))
 
     axes[0, 1].hist(residuals.values, bins=40, color="tab:blue", edgecolor="white")
     axes[0, 1].set_title("Residual distribution")
